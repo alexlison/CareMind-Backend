@@ -8,5 +8,4 @@ const router = express.Router();
 
 router.post("/register/caregiver", registerCaregiver);
 
-
 export default router;
