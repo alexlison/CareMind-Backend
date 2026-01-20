@@ -1,17 +1,27 @@
-// Registration controller
+// Caregiver Registration controller
 
-export const register = async (req, res) => {
+import { registerCaregiverService } from "../services/auth.service.js";
+
+export const registerCaregiver = async (req,res) => {
+
   try {
-    const data = req.body;
 
-    res.status(201).json({
-      message: "Register controller working",
-      data: data
+    const InputData = req.body;
+
+    const caregiver = await registerCaregiverService(InputData);
+
+    return res.status(201).json({
+      Status:"Success",
+      message:"Caregiver registered successfully",
+      data:caregiver,
+
     });
-
+    
   } catch (error) {
-    res.status(500).json({
-      message: "Something went wrong"
+    return res.status(error.statusCode || 400).json({
+      Status:"Error",
+      message:error.message || "Registration failed"
     });
   }
+
 };

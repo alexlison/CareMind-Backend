@@ -1,12 +1,12 @@
 import express from "express";
-import { register } from "../controllers/auth.controller.js";
+import { registerCaregiver } from "../controllers/auth.controller.js";
 
 const router = express.Router();
 
 
 // Route definition
 
-router.post("/register", register);
+router.post("/register/caregiver", registerCaregiver);
 
 
 export default router;
