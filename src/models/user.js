@@ -32,10 +32,6 @@ const userSchema = new mongoose.Schema(
         type: String,
       },
 
-      relationship: {
-        type: String,
-      },
-
       address: {
         street: String,
         city: String,
