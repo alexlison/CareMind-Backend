@@ -29,6 +29,10 @@ const userSchema = new mongoose.Schema(
         type: String,
       },
 
+      gender: {
+        type: String,
+      },
+
       address: {
         street: String,
         city: String,

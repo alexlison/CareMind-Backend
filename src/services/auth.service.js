@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 
 export const registerCaregiverService = async(data) => {
 
-    const { name,email,phone,password,address } = data;
+    const { name,email,phone,password,address,gender } = data;
 
     const emailExists = await user.findOne({
         "caregiver.email":email,
@@ -39,6 +39,7 @@ const caregiver = await user.create({
         email,
         phone,
         password:hashedPassword,
+        gender,
         address,
     }
 
