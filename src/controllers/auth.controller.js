@@ -1,6 +1,6 @@
 // Caregiver Registration controller
 
-import { registerCaregiverService } from "../services/auth.service.js";
+import { loginService, registerCaregiverService } from "../services/auth.service.js";
 
 export const registerCaregiver = async (req,res) => {
 
@@ -24,4 +24,34 @@ export const registerCaregiver = async (req,res) => {
     });
   }
 
+};
+
+// Login Controller
+
+export const login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({
+                Status: "Error",
+                message: "Email and password are required"
+            });
+        }
+
+        const result = await loginService(email, password);
+
+        return res.status(200).json({
+            Status: "Success",
+            message: "Login successful",
+            user: result.user,
+            token: result.token
+        });
+        
+    } catch (error) {
+        return res.status(error.statusCode || 400).json({
+            Status: "Error",
+            message: error.message || "Login failed"
+        });
+    }
 };
