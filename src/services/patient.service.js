@@ -73,8 +73,7 @@ export const addPatientService = async (patientData, caregiverId, imagePath = nu
 export const getAllPatientsService = async (caregiverId) => {
   try {
     const patients = await Patient.find({ 
-      caregiverId: caregiverId,
-      isActive: true 
+      caregiverId: caregiverId, 
     })
       .select('-password')
       .sort({ createdAt: -1 });
@@ -102,7 +101,6 @@ export const getPatientByIdService = async (patientId, caregiverId) => {
     const patient = await Patient.findOne({
       _id: patientId,
       caregiverId: caregiverId,
-      isActive: true
     }).select('-password');
 
     if (!patient) {
@@ -178,7 +176,6 @@ export const updatePatientService = async (patientId, caregiverId, updateData, n
     const patient = await Patient.findOne({ 
       _id: patientId,
       caregiverId: caregiverId,
-      isActive: true
     });
 
     if (!patient) {
