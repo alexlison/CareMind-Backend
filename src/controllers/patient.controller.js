@@ -3,7 +3,8 @@ import {
   getAllPatientsService,
   getPatientByIdService,
   updatePatientService,
-  togglePatientStatusService
+  togglePatientStatusService,
+  getMyPatientsService
 } from "../services/patient.service.js";
 
 // Add Patient Controller
@@ -101,6 +102,60 @@ export const getAllPatients = async (req, res) => {
     });
   }
 };
+
+// Get Patients for Logged-in Caregiver Controller
+export const getMyPatients = async (req, res) => {
+  try {
+    
+    const caregiverId = req.user.userId;
+    
+    if (!caregiverId) {
+      return res.status(400).json({
+        status: "FAILED",
+        message: "User ID not found in token",
+        data: null
+      });
+    }
+
+    const result = await getMyPatientsService(caregiverId);
+
+    if (result.status === "SUCCESS") {
+      return res.status(200).json({
+        status: result.status,
+        message: result.message,
+        data: result.data,
+        count: result.count
+      });
+    } else if (result.status === "NOT_FOUND") {
+      return res.status(404).json({
+        status: result.status,
+        message: result.message,
+        data: result.data
+      });
+    } else if (result.status === "FORBIDDEN") {
+      return res.status(403).json({
+        status: result.status,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      return res.status(400).json({
+        status: result.status,
+        message: result.message,
+        data: result.data
+      });
+    }
+
+  } catch (error) {
+    console.error("Get my patients controller error:", error);
+    res.status(500).json({
+      status: "FAILED",
+      message: "Failed to retrieve patients",
+      data: null
+    });
+  }
+};
+
 
 // Get Single Patient Controller
 export const getPatientById = async (req, res) => {

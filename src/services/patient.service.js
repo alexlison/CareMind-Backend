@@ -129,6 +129,49 @@ export const getPatientByIdService = async (patientId, caregiverId) => {
   }
 };
 
+// Get Patients by Logged-in Caregiver
+export const getMyPatientsService = async (caregiverId) => {
+  try {    
+    const caregiver = await User.findById(caregiverId);
+    if (!caregiver) {
+      return {
+        status: "NOT_FOUND",
+        message: "Caregiver not found",
+        data: null
+      };
+    }
+    
+    if (caregiver.role !== "caregiver") {
+      return {
+        status: "FORBIDDEN",
+        message: "User is not a caregiver",
+        data: null
+      };
+    }
+    
+    const patients = await Patient.find({ 
+      caregiverId: caregiverId
+    })
+      .select('-password')
+      .sort({ createdAt: -1 });
+
+    return {
+      status: "SUCCESS",
+      message: "Patients retrieved successfully",
+      data: patients,
+      count: patients.length
+    };
+
+  } catch (error) {
+    console.error("Get my patients service error:", error);
+    return {
+      status: "FAILED",
+      message: "Failed to retrieve patients",
+      data: null
+    };
+  }
+};
+
 // Update Patient Service
 export const updatePatientService = async (patientId, caregiverId, updateData, newImagePath = null) => {
   try {
