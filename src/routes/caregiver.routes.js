@@ -7,6 +7,7 @@ import {
   getPatientById,
   updatePatient,
   togglePatientStatus,
+  getMyPatients,
 } from "../controllers/patient.controller.js";
 import { isCaregiver } from "../middlewares/caregiver.middleware.js";
 
@@ -19,7 +20,8 @@ router.use(isCaregiver);
 // Patient  operations
 router.post("/add", upload.single("image"), addPatient);
 router.post("/all", getAllPatients);
-router.post("/:id", getPatientById);
+router.post("/my-patients", getMyPatients); 
+router.post("/:id", getPatientById);    
 router.put("/update/:id", upload.single("image"), updatePatient);
 router.put("/toggle-status/:id", togglePatientStatus);
 
