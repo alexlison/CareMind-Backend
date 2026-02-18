@@ -11,6 +11,7 @@ app.use(express.json());
 
 app.use("/uploads", express.static("uploads"));
 app.use("/medicines", express.static("medicines"));
+app.use("/relations", express.static("relations"));
 
 
 // Routes
