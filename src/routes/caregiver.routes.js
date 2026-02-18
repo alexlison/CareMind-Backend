@@ -2,6 +2,8 @@ import express from "express";
 import { authenticate } from "../middlewares/auth.middleware.js";
 import upload from "../config/multer.config.js";
 import uploadMedicine from "../config/medicine.multer.js"; 
+import uploadRelation from "../config/relation.multer.js";
+
 
 import {
   addPatient,
@@ -14,12 +16,21 @@ import {
 import { isCaregiver } from "../middlewares/caregiver.middleware.js";
 import { addRoutine, getAllRoutines, getRoutineById, toggleRoutineStatus, updateRoutine } from "../controllers/routine.controllers.js";
 import { addMedicine, getAllMedicines, getMedicineById, toggleMedicineStatus, updateMedicine } from "../controllers/medicine.controllers.js";
+import { addRelation, getAllRelations, getRelationById, updateRelation } from "../controllers/relation.controllers.js";
 
 const router = express.Router();
 
 
 router.use(authenticate);
 router.use(isCaregiver);
+
+
+// Relation Management Routes
+router.post("/addRelation", uploadRelation.single("photo"), addRelation);
+router.post("/allRelations", getAllRelations);
+router.get("/relationById/:id", getRelationById);
+router.put("/relationUpdate/:id", uploadRelation.single("photo"), updateRelation);
+
 
 // Routine Management Routes 
 router.post("/addRoutine", addRoutine);
