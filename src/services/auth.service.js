@@ -1,4 +1,5 @@
 import user from "../models/user.js";
+import Patient from "../models/patient.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
@@ -112,3 +113,51 @@ export const loginService = async(email, password) => {
         token: token
     };
 }
+
+
+// Patient Login Service
+export const patientLoginService = async (email, password) => {
+    const patient = await Patient.findOne({ 
+        email: email.toLowerCase().trim(),
+        isActive: true 
+    });
+
+    if (!patient) {
+        const error = new Error("Invalid email or password");
+        error.statusCode = 401;
+        throw error;
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, patient.password);
+    
+    if (!isPasswordValid) {
+        const error = new Error("Invalid email or password");
+        error.statusCode = 401;
+        throw error;
+    }
+
+    const tokenData = {
+        userId: patient._id,
+        role: "patient",
+        email: patient.email,
+        name: patient.name,
+        caregiverId: patient.caregiverId
+    };
+
+    const token = jwt.sign(
+        tokenData, 
+        process.env.JWT_SECRET, 
+        { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
+    );
+
+    const patientResponse = patient.toObject();
+    delete patientResponse.password;
+
+    return {
+        user: {
+            ...patientResponse,
+            role: "patient"
+        },
+        token: token
+    };
+};
