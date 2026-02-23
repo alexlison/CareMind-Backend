@@ -3,6 +3,9 @@ import cors from "cors";
 
 import authRoutes from "./routes/auth.routes.js";
 import caregiverRoutes from "./routes/caregiver.routes.js";
+import patientRoutes from "./routes/patient.routes.js";
+import automationRoutes from "./routes/automation.routes.js";
+
 
 const app = express();
 
@@ -18,5 +21,8 @@ app.use("/relations", express.static("relations"));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/caregiver",caregiverRoutes);
+app.use("/api/patient", patientRoutes);
+app.use("/api/automation", automationRoutes);
+
 
 export default app;
