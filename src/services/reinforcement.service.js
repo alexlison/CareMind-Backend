@@ -26,6 +26,37 @@ import TaskTracking from "../models/taskTracking.js";
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 /**
+ * Converts any time string to total minutes since midnight.
+ * Handles BOTH formats:
+ *   "08:00 AM" / "08:00 PM"  (12hr with meridiem)
+ *   "08:00"    / "20:00"     (24hr)
+ *
+ * REQUIRED for correct hourSlot detection — "08:00 PM" must map to
+ * hour 20, not hour 8. Without this, PM tasks are incorrectly grouped
+ * with AM tasks when detecting problematic time patterns.
+ */
+const timeToMinutes = (timeStr) => {
+  if (!timeStr) return 0;
+
+  const str = timeStr.trim();
+
+  if (str.includes("AM") || str.includes("PM")) {
+    const parts = str.split(" ");
+    const meridiem = parts[1]; // "AM" or "PM"
+    const [hStr, mStr] = parts[0].split(":");
+    let hours = parseInt(hStr, 10);
+    const minutes = parseInt(mStr, 10);
+    if (meridiem === "PM" && hours !== 12) hours += 12;
+    if (meridiem === "AM" && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+  }
+
+  // 24hr format
+  const [h, m] = str.split(":").map(Number);
+  return h * 60 + m;
+};
+
+/**
  * Calculate daily score from a set of tasks.
  * Daily Score = (Sum of task scores / task count) * 10
  * Range: 0 (perfect) to 40 (all missed) → spec says 0-100, so we keep as-is since
@@ -144,11 +175,13 @@ export const updateReinforcementProfileService = async (patientId) => {
         : 0;
 
     // ── Problematic times (hour slots with ≥4 missed/very-late in 7 days) ─
-    // We count tasks with score ≥ 3 (16+ min late OR missed)
+    // FIX: Use timeToMinutes() to correctly convert "08:00 PM" → hour 20
+    // not substring(0,2) which gives "08" for both AM and PM — wrong for PM tasks
     const hourMap = new Map();
     for (const task of tasks) {
       if ((task.score || 0) >= 3) {
-        const hourSlot = task.scheduledTime.substring(0, 2); // "09", "14" etc.
+        const totalMins = timeToMinutes(task.scheduledTime);
+        const hourSlot = String(Math.floor(totalMins / 60)).padStart(2, "0"); // "08", "20" etc.
         hourMap.set(hourSlot, (hourMap.get(hourSlot) || 0) + 1);
       }
     }
@@ -230,7 +263,7 @@ export const updateReinforcementProfileService = async (patientId) => {
         priorityScore,
         lastUpdated: new Date(),
       },
-      { upsert: true, returnDocument: 'after' }
+      { upsert: true, returnDocument: "after" }
     );
 
     return {
