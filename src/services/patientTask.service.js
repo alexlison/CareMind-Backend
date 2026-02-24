@@ -304,15 +304,22 @@ export const getTodayTasksService = async (patientId) => {
         displayStatus = "missed";
       }
 
-      // Use DB latenessMinutes if already set by cron, otherwise calculate from minutesDiff
-      const effectiveLatenessMinutes =
-        task.latenessMinutes > 0
-          ? task.latenessMinutes
-          : displayStatus === "missed"
-          ? minutesDiff
-          : minutesDiff > 0
-          ? minutesDiff
-          : 0;
+      // FIX: completed tasks must ALWAYS use the DB latenessMinutes (even if 0).
+      // Old logic used minutesDiff (current time - scheduled time) for completed tasks
+      // with latenessMinutes=0, which gives a huge wrong number hours later.
+      // e.g. completed on time at 10:45 AM → latenessMinutes=0, score=0 in DB.
+      // But at 7:52 PM the old code calculated minutesDiff=547 and showed "9h 7m late".
+      let effectiveLatenessMinutes;
+      if (displayStatus === "completed") {
+        // Completed: always trust DB value (set correctly at completion time)
+        effectiveLatenessMinutes = task.latenessMinutes || 0;
+      } else if (displayStatus === "missed") {
+        // Missed: use DB value if set, otherwise current diff
+        effectiveLatenessMinutes = task.latenessMinutes > 0 ? task.latenessMinutes : minutesDiff;
+      } else {
+        // Pending/late: show how late it currently is
+        effectiveLatenessMinutes = minutesDiff > 0 ? minutesDiff : 0;
+      }
 
       // Use DB score if already set by cron, otherwise derive from display status
       const effectiveScore =
@@ -524,14 +531,15 @@ export const getTaskDetailsService = async (taskId, patientId) => {
       minutesDiff >= -30 &&
       minutesDiff <= 30;
 
-    const effectiveLatenessMinutes =
-      task.latenessMinutes > 0
-        ? task.latenessMinutes
-        : displayStatus === "missed"
-        ? minutesDiff
-        : minutesDiff > 0
-        ? minutesDiff
-        : 0;
+    // FIX: completed tasks must use DB latenessMinutes (even if 0), never current time diff
+    let effectiveLatenessMinutes;
+    if (displayStatus === "completed") {
+      effectiveLatenessMinutes = task.latenessMinutes || 0;
+    } else if (displayStatus === "missed") {
+      effectiveLatenessMinutes = task.latenessMinutes > 0 ? task.latenessMinutes : minutesDiff;
+    } else {
+      effectiveLatenessMinutes = minutesDiff > 0 ? minutesDiff : 0;
+    }
 
     const effectiveScore =
       displayStatus === "missed" && task.score === 0 ? 4 : task.score || 0;
