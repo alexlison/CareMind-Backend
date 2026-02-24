@@ -11,13 +11,6 @@ import express from "express";
 import { runMidnightProcessService } from "../services/dailyAutomation.service.js";
 import { checkAndSendAlertsService } from "../services/alert.service.js";
 
-
-
-import Patient from "../models/patient.js";
-import Medicine from "../models/medicine.js";
-import Routine from "../models/routine.js";
-import TaskTracking from "../models/taskTracking.js";
-
 const router = express.Router();
 
 // Middleware: validate API key for all automation routes
@@ -78,66 +71,6 @@ router.post("/check-alerts", validateApiKey, async (req, res) => {
 });
 
 
-// ONE-TIME USE: Creates today's tasks only, skips missed-marking
-router.post("/create-today-tasks-only", validateApiKey, async (req, res) => {
-  try {
-    const today = new Date().toISOString().split("T")[0];
-    const patients = await Patient.find({ isActive: true }).select("_id").lean();
-    let totalCreated = 0;
 
-    for (const patient of patients) {
-      const patientId = patient._id;
-
-      const medicines = await Medicine.find({ patientId, status: "active" })
-        .select("_id name timing").lean();
-
-      for (const med of medicines) {
-        let timings = [];
-        if (typeof med.timing === "string") {
-          try { timings = JSON.parse(med.timing); } catch { timings = [med.timing]; }
-        } else if (Array.isArray(med.timing)) {
-          timings = med.timing;
-        }
-
-        for (const timing of timings) {
-          if (!timing) continue;
-          const exists = await TaskTracking.exists({ patientId, taskId: med._id, scheduledDate: today, scheduledTime: timing });
-          if (!exists) {
-            await TaskTracking.create({
-              patientId, taskId: med._id, taskType: "Medicine",
-              taskName: med.name, scheduledDate: today,
-              scheduledTime: timing, status: "pending", score: 0, alertsSent: [],
-            });
-            totalCreated++;
-          }
-        }
-      }
-
-      const routines = await Routine.find({ patientId, status: "active" })
-        .select("_id title scheduledTime").lean();
-
-      for (const routine of routines) {
-        if (!routine.scheduledTime) continue;
-        const exists = await TaskTracking.exists({ patientId, taskId: routine._id, scheduledDate: today });
-        if (!exists) {
-          await TaskTracking.create({
-            patientId, taskId: routine._id, taskType: "Routine",
-            taskName: routine.title, scheduledDate: today,
-            scheduledTime: routine.scheduledTime, status: "pending", score: 0, alertsSent: [],
-          });
-          totalCreated++;
-        }
-      }
-    }
-
-    return res.status(200).json({
-      status: "SUCCESS",
-      message: `Today's tasks created. Total: ${totalCreated}`,
-      data: { date: today, tasksCreated: totalCreated, patientsProcessed: patients.length }
-    });
-  } catch (error) {
-    return res.status(500).json({ status: "FAILED", message: error.message, data: null });
-  }
-});
 
 export default router;
