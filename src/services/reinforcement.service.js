@@ -2,12 +2,20 @@
  * reinforcement.service.js
  * CareMind – Reinforcement / pattern-learning service
  *
+ * ROOT BUG FIXED: last7Days now uses IST dates not UTC.
+ * Previously when running at 18:31 UTC (= 12:01 AM IST), the date range
+ * was one day behind — so it looked for tasks on wrong dates, found nothing,
+ * and silently saved a zeroed-out profile.
+ *
+ * ALSO FIXED: hourSlot now uses timeToMinutes() so "08:00 PM" correctly
+ * maps to hour 20, not hour 8.
+ *
  * Spec rules:
- *  Daily Score  = (Sum of all task scores / count) × 10   → higher = WORSE (0=best, 40=worst but capped at 100)
+ *  Daily Score  = (Sum of all task scores / count) × 10
  *  Weekly Average = weighted avg of last 7 days (day-1=100%, day-2=90%, ..., day-7=40%)
  *  Problematic time : ≥4 misses in last 7 days for a given hour slot
  *  Problematic task type : miss rate ≥ 40%
- *  Problematic day : average score for that day ≥ 30 (score scale 0-4 → threshold 3 out of 40 adjusted)
+ *  Problematic day : average score for that day ≥ 30
  *
  *  Priority levels:
  *    0-20  → normal   (alertInterval=10 min)
@@ -24,25 +32,31 @@ import TaskTracking from "../models/taskTracking.js";
 // ─────────────────────────────────────────────
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+/**
+ * Returns date string N days from now in IST as "YYYY-MM-DD".
+ * daysOffset = -1 → yesterday IST, -7 → 7 days ago IST
+ */
+const getISTDateString = (daysOffset = 0) => {
+  const now = new Date();
+  const istDate = new Date(now.getTime() + IST_OFFSET_MS);
+  istDate.setDate(istDate.getDate() + daysOffset);
+  return istDate.toISOString().split("T")[0];
+};
 
 /**
  * Converts any time string to total minutes since midnight.
  * Handles BOTH formats:
  *   "08:00 AM" / "08:00 PM"  (12hr with meridiem)
  *   "08:00"    / "20:00"     (24hr)
- *
- * REQUIRED for correct hourSlot detection — "08:00 PM" must map to
- * hour 20, not hour 8. Without this, PM tasks are incorrectly grouped
- * with AM tasks when detecting problematic time patterns.
  */
 const timeToMinutes = (timeStr) => {
   if (!timeStr) return 0;
-
   const str = timeStr.trim();
-
   if (str.includes("AM") || str.includes("PM")) {
     const parts = str.split(" ");
-    const meridiem = parts[1]; // "AM" or "PM"
+    const meridiem = parts[1];
     const [hStr, mStr] = parts[0].split(":");
     let hours = parseInt(hStr, 10);
     const minutes = parseInt(mStr, 10);
@@ -50,8 +64,6 @@ const timeToMinutes = (timeStr) => {
     if (meridiem === "AM" && hours === 12) hours = 0;
     return hours * 60 + minutes;
   }
-
-  // 24hr format
   const [h, m] = str.split(":").map(Number);
   return h * 60 + m;
 };
@@ -59,14 +71,11 @@ const timeToMinutes = (timeStr) => {
 /**
  * Calculate daily score from a set of tasks.
  * Daily Score = (Sum of task scores / task count) * 10
- * Range: 0 (perfect) to 40 (all missed) → spec says 0-100, so we keep as-is since
- * max individual score is 4 → max avg = 4 → × 10 = 40.
- * The spec's "Priority Score" then adds bonuses on top.
  */
 const calcDayScore = (dayTasks) => {
-  if (dayTasks.length === 0) return null; // no data
+  if (dayTasks.length === 0) return null;
   const sum = dayTasks.reduce((acc, t) => acc + (t.score || 0), 0);
-  return (sum / dayTasks.length) * 10; // 0-40 raw, higher = worse
+  return (sum / dayTasks.length) * 10;
 };
 
 // ─────────────────────────────────────────────
@@ -75,7 +84,7 @@ const calcDayScore = (dayTasks) => {
 
 export const calculateDailyScoreService = async (patientId, date) => {
   try {
-    const targetDate = date || new Date().toISOString().split("T")[0];
+    const targetDate = date || getISTDateString(0);
 
     const tasks = await TaskTracking.find({ patientId, scheduledDate: targetDate });
 
@@ -89,8 +98,8 @@ export const calculateDailyScoreService = async (patientId, date) => {
 
     const dailyScore = calcDayScore(tasks) ?? 0;
     const completedCount = tasks.filter((t) => t.status === "completed").length;
-    const missedCount = tasks.filter((t) => t.status === "missed").length;
-    const pendingCount = tasks.filter((t) => t.status === "pending").length;
+    const missedCount    = tasks.filter((t) => t.status === "missed").length;
+    const pendingCount   = tasks.filter((t) => t.status === "pending").length;
 
     return {
       status: "SUCCESS",
@@ -110,37 +119,39 @@ export const calculateDailyScoreService = async (patientId, date) => {
 };
 
 // ─────────────────────────────────────────────
-// Update Reinforcement Profile (called nightly)
+// Update Reinforcement Profile (called nightly by midnight process)
 // ─────────────────────────────────────────────
 
 export const updateReinforcementProfileService = async (patientId) => {
   try {
-    // Build last 7 day strings (yesterday … 7 days ago)
+    // Build last 7 day strings in IST (yesterday to 7 days ago)
+    // FIX: was UTC → one day behind at midnight IST → found 0 tasks → zeroed profile
     const last7Days = [];
     for (let i = 1; i <= 7; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      last7Days.push(d.toISOString().split("T")[0]);
+      last7Days.push(getISTDateString(-i));
     }
+
+    console.log(`[Reinforcement] Patient ${patientId} — looking at IST dates: ${last7Days.join(", ")}`);
 
     const tasks = await TaskTracking.find({
       patientId,
       scheduledDate: { $in: last7Days },
     });
 
+    console.log(`[Reinforcement] Patient ${patientId} — found ${tasks.length} tasks across last 7 days`);
+
     // ── Daily scores with weighted average ────────────────────────────────
-    // Weight: day-1 = 100, day-2 = 90, ..., day-7 = 40
     const dailyScores = [];
-    let weightedSum = 0;
-    let totalWeight = 0;
+    let weightedSum  = 0;
+    let totalWeight  = 0;
 
     for (let i = 0; i < last7Days.length; i++) {
-      const date = last7Days[i];
+      const date     = last7Days[i];
       const dayTasks = tasks.filter((t) => t.scheduledDate === date);
-      const score = calcDayScore(dayTasks);
+      const score    = calcDayScore(dayTasks);
 
       if (score !== null) {
-        const weight = 100 - i * 10; // 100, 90, 80, … 40
+        const weight = 100 - i * 10; // 100, 90, 80 … 40
         dailyScores.push({ date, score: Math.min(100, score) });
         weightedSum += score * weight;
         totalWeight += weight;
@@ -151,7 +162,7 @@ export const updateReinforcementProfileService = async (patientId) => {
 
     // ── Medicine vs Routine averages ──────────────────────────────────────
     const medicineTasks = tasks.filter((t) => t.taskType === "Medicine");
-    const routineTasks = tasks.filter((t) => t.taskType === "Routine");
+    const routineTasks  = tasks.filter((t) => t.taskType === "Routine");
 
     const medicineAverage =
       medicineTasks.length > 0
@@ -174,14 +185,13 @@ export const updateReinforcementProfileService = async (patientId) => {
         ? routineTasks.filter((t) => t.status === "missed").length / routineTasks.length
         : 0;
 
-    // ── Problematic times (hour slots with ≥4 missed/very-late in 7 days) ─
-    // FIX: Use timeToMinutes() to correctly convert "08:00 PM" → hour 20
-    // not substring(0,2) which gives "08" for both AM and PM — wrong for PM tasks
+    // ── Problematic times ─────────────────────────────────────────────────
+    // FIX: use timeToMinutes so "08:00 PM" → hour 20, not hour 8
     const hourMap = new Map();
     for (const task of tasks) {
       if ((task.score || 0) >= 3) {
         const totalMins = timeToMinutes(task.scheduledTime);
-        const hourSlot = String(Math.floor(totalMins / 60)).padStart(2, "0"); // "08", "20" etc.
+        const hourSlot  = String(Math.floor(totalMins / 60)).padStart(2, "0");
         hourMap.set(hourSlot, (hourMap.get(hourSlot) || 0) + 1);
       }
     }
@@ -193,8 +203,7 @@ export const updateReinforcementProfileService = async (patientId) => {
       }
     }
 
-    // ── Problematic days (day average score ≥ 30 on 0-40 scale = ≥ 3 avg raw score) ─
-    // Spec: "day average ≥ 30" using the 0-100 scaled score → threshold = 30
+    // ── Problematic days ──────────────────────────────────────────────────
     const dayScoreMap = new Map();
     for (const task of tasks) {
       const dayName = DAYS[new Date(task.scheduledDate + "T00:00:00").getDay()];
@@ -206,43 +215,39 @@ export const updateReinforcementProfileService = async (patientId) => {
 
     const problematicDays = [];
     for (const [day, { sum, count }] of dayScoreMap.entries()) {
-      const dayAvg = (sum / count) * 10; // 0-40 scaled
-      if (dayAvg >= 30) {
-        problematicDays.push(day);
-      }
+      const dayAvg = (sum / count) * 10;
+      if (dayAvg >= 30) problematicDays.push(day);
     }
 
     // ── Problematic task types ────────────────────────────────────────────
     const problematicTaskTypes = [];
     if (medicineMissRate >= 0.4) problematicTaskTypes.push("Medicine");
-    if (routineMissRate >= 0.4) problematicTaskTypes.push("Routine");
+    if (routineMissRate  >= 0.4) problematicTaskTypes.push("Routine");
 
     // ── Priority Score ────────────────────────────────────────────────────
-    // Priority Score = weeklyAverage + (# problematic times × 10) + (# problematic types × 10) + (# problematic days × 10)
     let priorityScore = weeklyAverage;
-    priorityScore += problematicTimes.length * 10;
+    priorityScore += problematicTimes.length    * 10;
     priorityScore += problematicTaskTypes.length * 10;
-    priorityScore += problematicDays.length * 10;
-    priorityScore = Math.min(100, priorityScore);
+    priorityScore += problematicDays.length     * 10;
+    priorityScore  = Math.min(100, priorityScore);
 
-    // ── Priority level & alert settings ──────────────────────────────────
-    let priorityLevel = "normal";
-    let alertInterval = 10;
+    // ── Priority level & alert interval ──────────────────────────────────
+    let priorityLevel   = "normal";
+    let alertInterval   = 10;
     let alertMultiplier = 1.0;
 
     if (priorityScore > 60) {
-      priorityLevel = "critical";
-      alertInterval = 3;
-      alertMultiplier = 3.0;
+      priorityLevel = "critical"; alertInterval = 3;  alertMultiplier = 3.0;
     } else if (priorityScore > 40) {
-      priorityLevel = "high";
-      alertInterval = 5;
-      alertMultiplier = 2.0;
+      priorityLevel = "high";     alertInterval = 5;  alertMultiplier = 2.0;
     } else if (priorityScore > 20) {
-      priorityLevel = "medium";
-      alertInterval = 8;
-      alertMultiplier = 1.5;
+      priorityLevel = "medium";   alertInterval = 8;  alertMultiplier = 1.5;
     }
+
+    console.log(
+      `[Reinforcement] Patient ${patientId} — weeklyAvg: ${weeklyAverage.toFixed(1)}` +
+      ` | priorityScore: ${priorityScore.toFixed(1)} | level: ${priorityLevel} | alertInterval: ${alertInterval}min`
+    );
 
     const reinforcement = await Reinforcement.findOneAndUpdate(
       { patientId },
@@ -263,7 +268,8 @@ export const updateReinforcementProfileService = async (patientId) => {
         priorityScore,
         lastUpdated: new Date(),
       },
-      { upsert: true, returnDocument: "after" }
+     { upsert: true, returnDocument: 'after' }
+
     );
 
     return {
