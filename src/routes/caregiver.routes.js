@@ -22,6 +22,7 @@ import {
   deleteCaregiverNotification,
   clearAllCaregiverNotifications,
 } from "../controllers/caregiverNotification.controller.js";
+import {  getReinforcementProfileForCaregiver } from "../controllers/reinforcement.controller.js";
 
 
 const router = express.Router();
@@ -54,6 +55,10 @@ router.post("/allMedicines", getAllMedicines);
 router.get("/medicineById/:id", getMedicineById);
 router.put("/medicineUpdate/:id", uploadMedicine.single("image"), updateMedicine);
 router.put("/medicineToggle-status/:id", toggleMedicineStatus);
+
+// ========== MONITORING MANAGEMENT ROUTES ==========
+router.post("/reinforcement/Data", getReinforcementProfileForCaregiver);
+
 
 // ========== PATIENT MANAGEMENT ROUTES ==========
 router.post("/add", upload.single("image"), addPatient);

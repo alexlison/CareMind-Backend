@@ -91,8 +91,16 @@ const calcScore = (latenessMinutes) => {
 // medicine/routine was added after midnight.
 // ─────────────────────────────────────────────
 
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const getISTDateString = (daysOffset = 0) => {
+  const now = new Date();
+  const istDate = new Date(now.getTime() + IST_OFFSET_MS);
+  istDate.setDate(istDate.getDate() + daysOffset);
+  return istDate.toISOString().split("T")[0];
+};
+
 const ensureTodayTasksExist = async (patientId) => {
-  const today = new Date().toISOString().split("T")[0];
+  const today = getISTDateString(0); // FIX: was UTC, wrong at midnight IST
 
   const medicines = await Medicine.find({ patientId, status: "active" })
     .select("_id name timing")
@@ -171,7 +179,7 @@ export const getPatientDashboardService = async (patientId) => {
     // Ensure today's tasks are created (no-op if they already exist)
     await ensureTodayTasksExist(patientId);
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = getISTDateString(0); // FIX: was UTC, wrong at midnight IST
     const currentMinutes = getCurrentTimeInMinutes();
 
     const todayTasks = await TaskTracking.find({
@@ -282,7 +290,7 @@ export const getTodayTasksService = async (patientId) => {
   try {
     await ensureTodayTasksExist(patientId);
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = getISTDateString(0); // FIX: was UTC
     const currentMinutes = getCurrentTimeInMinutes();
 
     const tasks = await TaskTracking.find({ patientId, scheduledDate: today }).sort({
@@ -394,7 +402,7 @@ export const getPatientMedicinesService = async (patientId) => {
       createdAt: -1,
     });
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = getISTDateString(0); // FIX: was UTC
     const tracking = await TaskTracking.find({
       patientId,
       taskType: "Medicine",
@@ -450,7 +458,7 @@ export const getPatientRoutinesService = async (patientId) => {
       scheduledTime: 1,
     });
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = getISTDateString(0); // FIX: was UTC
     const tracking = await TaskTracking.find({
       patientId,
       taskType: "Routine",
