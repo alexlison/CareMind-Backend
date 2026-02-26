@@ -1,17 +1,6 @@
 /**
  * dailyAutomation.service.js
- * CareMind – Midnight automation service (runs at 12:01 AM IST daily)
- *
- * ROOT BUG FIXED: Date strings now use IST (UTC+5:30) not UTC.
- *
- * WHY IT HAPPENED:
- *   12:01 AM IST = 18:31 UTC of the PREVIOUS day.
- *   new Date().toISOString() → "2026-02-22T18:31:00Z"
- *   .split("T")[0]          → "2026-02-22"  ← WRONG (yesterday's UTC date)
- *   IST date is actually     → "2026-02-23"  ← CORRECT
- *
- * FIX: getISTDateString() adds 5h30m offset before extracting date string.
- *
+
  * Steps:
  *  1. Mark remaining PENDING tasks from YESTERDAY (IST) as missed
  *  2. Delete expired patient notifications
@@ -32,10 +21,7 @@ import { updateReinforcementProfileService } from "./reinforcement.service.js";
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in ms
 
-/**
- * Returns current date string in IST as "YYYY-MM-DD".
- * Optional daysOffset: -1 = yesterday IST, +1 = tomorrow IST.
- */
+
 const getISTDateString = (daysOffset = 0) => {
   const now = new Date();
   const istDate = new Date(now.getTime() + IST_OFFSET_MS);
@@ -51,8 +37,8 @@ export const runMidnightProcessService = async () => {
   const startTime = Date.now();
   const now = new Date();
 
-  const todayIST     = getISTDateString(0);   // e.g. "2026-02-23"
-  const yesterdayIST = getISTDateString(-1);  // e.g. "2026-02-22"
+  const todayIST     = getISTDateString(0);   
+  const yesterdayIST = getISTDateString(-1);  
 
   console.log(`[${now.toISOString()}] Starting midnight process…`);
   console.log(`[${now.toISOString()}] IST Today: ${todayIST} | IST Yesterday: ${yesterdayIST}`);

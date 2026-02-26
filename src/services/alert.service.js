@@ -1,20 +1,3 @@
-/**
- * alert.service.js
- * CareMind – Alert & notification service
- *
- * ROOT BUG FIXED: currentDateStr and caregiver guard now use IST dates not UTC.
- *
- * Responsibilities:
- *  1. Sole owner of pending → missed status mutations (with caregiver alert).
- *  2. Send 2-min-before reminders.
- *  3. Send follow-up alerts every N minutes (from Reinforcement profile).
- *  4. Stop all alerts once task is completed or missed.
- *
- * Alert timing (per spec):
- *   -2 min      → 2-minute reminder
- *   0 to +30 min → late alerts every alertInterval minutes
- *   > 30 min    → mark missed + caregiver alert (once per task per day)
- */
 
 import TaskTracking from "../models/taskTracking.js";
 import PatientNotification from "../models/patientNotification.js";
@@ -28,11 +11,6 @@ import Reinforcement from "../models/reinforcement.js";
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
-/**
- * Returns current date string in IST as "YYYY-MM-DD".
- * FIX: toISOString() gives UTC date which is WRONG at midnight IST
- * (12:01 AM IST = 18:31 UTC of previous day).
- */
 const getISTDateString = (daysOffset = 0) => {
   const now = new Date();
   const istDate = new Date(now.getTime() + IST_OFFSET_MS);
@@ -50,10 +28,7 @@ const formatTime = (time) => {
   return `${hour12}:${minutes} ${ampm}`;
 };
 
-/**
- * Converts any time string to total minutes since midnight.
- * Handles "08:00 AM" / "08:00 PM" and "08:00" / "20:00".
- */
+
 const timeToMinutes = (timeStr) => {
   if (!timeStr) return 0;
   const str = timeStr.trim();
@@ -71,12 +46,10 @@ const timeToMinutes = (timeStr) => {
   return h * 60 + m;
 };
 
-/** End of current IST day as a Date object */
 const endOfTodayIST = () => {
   const now     = new Date();
   const istDate = new Date(now.getTime() + IST_OFFSET_MS);
   istDate.setHours(23, 59, 59, 999);
-  // Convert back to UTC for storage
   return new Date(istDate.getTime() - IST_OFFSET_MS);
 };
 
@@ -88,7 +61,6 @@ export const checkAndSendAlertsService = async () => {
   const results = [];
   const now = new Date();
 
-  // FIX: use IST date, not UTC date
   const currentDateStr      = getISTDateString(0);
   const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
 
@@ -257,7 +229,7 @@ export const checkAndSendAlertsService = async () => {
 };
 
 // ─────────────────────────────────────────────
-// Send caregiver alert — once per task per IST day
+// Send caregiver alert
 // ─────────────────────────────────────────────
 
 const sendCaregiverAlert = async (task, now) => {
@@ -265,7 +237,6 @@ const sendCaregiverAlert = async (task, now) => {
     const patient = await Patient.findById(task.patientId).select("name caregiverId");
     if (!patient || !patient.caregiverId) return null;
 
-    // FIX: guard uses IST date start, not UTC date start
     const todayISTStart = new Date(new Date().getTime() + IST_OFFSET_MS);
     todayISTStart.setHours(0, 0, 0, 0);
     const todayISTStartUTC = new Date(todayISTStart.getTime() - IST_OFFSET_MS);

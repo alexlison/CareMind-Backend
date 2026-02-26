@@ -5,11 +5,7 @@
  * Jobs:
  *  1. Every minute  → checkAndSendAlertsService (handles reminder, late alerts, missed)
  *  2. 12:01 AM daily → runMidnightProcessService (creates tasks, marks missed, updates reinforcement)
- *
- * Note: The alert interval *per patient* is determined inside checkAndSendAlertsService
- * by reading each patient's Reinforcement profile. The cron still runs every minute
- * so we can react promptly; the per-patient alertInterval controls whether a notification
- * is actually *sent* during each run.
+
  */
 
 import cron from "node-cron";

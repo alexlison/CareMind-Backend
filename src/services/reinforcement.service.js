@@ -1,42 +1,4 @@
 /**
- * reinforcement.service.js
- * CareMind – Reinforcement / pattern-learning service
- *
- * BUGS FIXED:
- *
- *  1. IST DATE BUG (last7Days):
- *     Was: new Date().toISOString().split("T")[0]  → UTC date
- *     At 12:01 AM IST = 18:31 UTC of PREVIOUS day → date was 1 day behind
- *     → found 0 tasks → silently saved a zeroed-out profile
- *     Fix: getISTDateString() adds 5h30m offset before extracting date string.
- *
- *  2. problematicTimes ALWAYS EMPTY (two sub-bugs):
- *     a) Was checking (task.score >= 3) → counts "late" tasks, not just missed
- *        Fix: check task.status === "missed"
- *     b) Threshold was >= 4 → nearly impossible with small datasets (7 tasks)
- *        Fix: lowered to >= 2 misses in the same hour slot
- *
- *  3. problematicTaskIds NEVER POPULATED:
- *     The Reinforcement model has problematicTaskIds (ObjectId[]) and
- *     problematicTaskType fields but service never calculated or saved them.
- *     Fix: group missed tasks by taskId, flag any missed >= 2 times in 7 days.
- *
- *  4. hourSlot AM/PM bug:
- *     Was: parseInt(scheduledTime) → "08:00 PM" parsed as hour 8, not 20
- *     Fix: use timeToMinutes() then divide by 60.
- *
- *  5. findOneAndUpdate deprecated option:
- *     Was: { new: true } → Mongoose deprecation warning
- *     Fix: { returnDocument: 'after' }
- *
- * Spec rules:
- *  Daily Score    = (Sum of all task scores / count) × 10
- *  Weekly Average = weighted avg of last 7 days (day-1=100%, day-2=90%, ..., day-7=40%)
- *  Problematic time      : ≥2 misses in last 7 days for same hour slot
- *  Problematic task type : miss rate ≥ 40%
- *  Problematic day       : average score for that day ≥ 30
- *  Problematic task IDs  : specific tasks missed ≥ 2 times in last 7 days
- *
  *  Priority levels:
  *    0–20  → normal   (alertInterval = 10 min)
  *    21–40 → medium   (alertInterval = 8 min)
@@ -54,12 +16,6 @@ import TaskTracking  from "../models/taskTracking.js";
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in ms
 
-/**
- * Returns a date string in IST as "YYYY-MM-DD".
- * daysOffset = 0  → today IST
- * daysOffset = -1 → yesterday IST
- * daysOffset = -7 → 7 days ago IST
- */
 const getISTDateString = (daysOffset = 0) => {
   const now     = new Date();
   const istDate = new Date(now.getTime() + IST_OFFSET_MS);
@@ -67,12 +23,7 @@ const getISTDateString = (daysOffset = 0) => {
   return istDate.toISOString().split("T")[0];
 };
 
-/**
- * Converts any time string to total minutes since midnight.
- * Handles BOTH formats:
- *   "08:00 AM" / "08:00 PM"  (12-hr with meridiem)
- *   "08:00"    / "20:00"     (24-hr)
- */
+
 const timeToMinutes = (timeStr) => {
   if (!timeStr) return 0;
   const str = timeStr.trim();
@@ -89,11 +40,7 @@ const timeToMinutes = (timeStr) => {
   return h * 60 + m;
 };
 
-/**
- * Calculate daily score from a set of tasks.
- * Daily Score = (Sum of task scores / task count) * 10
- * Returns null if no tasks (so we can skip days with no data).
- */
+
 const calcDayScore = (dayTasks) => {
   if (dayTasks.length === 0) return null;
   const sum = dayTasks.reduce((acc, t) => acc + (t.score || 0), 0);
@@ -101,7 +48,7 @@ const calcDayScore = (dayTasks) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Calculate Daily Score  (on-demand — called by controller)
+// Calculate Daily Score  
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const calculateDailyScoreService = async (patientId, date) => {
@@ -147,14 +94,13 @@ export const calculateDailyScoreService = async (patientId, date) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Update Reinforcement Profile  (called nightly by midnight process)
+// Update Reinforcement Profile  (called  by midnight process)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const updateReinforcementProfileService = async (patientId) => {
   try {
 
     // ── Build last 7 IST date strings (yesterday → 7 days ago) ──────────────
-    // FIX 1: was UTC → one day behind at midnight IST → found 0 tasks → zeroed profile
     const last7Days = [];
     for (let i = 1; i <= 7; i++) {
       last7Days.push(getISTDateString(-i));
@@ -222,9 +168,7 @@ export const updateReinforcementProfileService = async (patientId) => {
       : 0;
 
     // ── Problematic times ────────────────────────────────────────────────────
-    // FIX 2a: was checking score >= 3 (counts late tasks too) — should be status === "missed"
-    // FIX 2b: threshold was >= 4 (impossible with small datasets) — lowered to >= 2
-    // FIX 4:  use timeToMinutes() so "08:00 PM" → hour 20, not hour 8
+
     const hourMap = new Map();
     for (const task of tasks) {
       if (task.status === "missed") {
@@ -242,9 +186,7 @@ export const updateReinforcementProfileService = async (patientId) => {
     }
 
     // ── Problematic task IDs ─────────────────────────────────────────────────
-    // FIX 3: was never populated — model has problematicTaskIds (ObjectId[]) and
-    // problematicTaskType fields that were always empty.
-    // Now: find specific tasks missed >= 2 times across last 7 days.
+
     const taskMissMap = new Map();
     for (const task of tasks) {
       if (task.status === "missed") {
@@ -317,8 +259,7 @@ export const updateReinforcementProfileService = async (patientId) => {
     );
 
     // ── Upsert reinforcement profile ──────────────────────────────────────────
-    // FIX 5: was { new: true } → Mongoose deprecation warning
-    //        Fix: { returnDocument: 'after' }
+
     const reinforcement = await Reinforcement.findOneAndUpdate(
       { patientId },
       {
@@ -363,7 +304,6 @@ export const getReinforcementProfileService = async (patientId) => {
     const reinforcement = await Reinforcement.findOne({ patientId });
 
     if (!reinforcement) {
-      // Return a safe default — profile will be created at next midnight process
       return {
         status:  "SUCCESS",
         message: "No reinforcement profile found — will be generated at midnight",

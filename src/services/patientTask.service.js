@@ -1,15 +1,4 @@
-/**
- * patientTask.service.js
- * CareMind – Patient-side service layer
- *
- * Key rules from the spec:
- *  - Complete button visible: from 30 min BEFORE to 30 min AFTER scheduled time
- *  - After 30+ min past scheduled time with no completion → MISSED
- *  - Score: 0=on-time  1=1-10 min late  2=11-15 min late  3=16-30 min late  4=missed
- *  - Status mutations (pending → missed) ONLY happen inside alert.service.js
- *    so that caregiver notifications are always sent. Dashboard and today-tasks
- *    services are READ-ONLY with respect to DB status.
- */
+
 
 import TaskTracking from "../models/taskTracking.js";
 import Medicine from "../models/medicine.js";
@@ -33,12 +22,6 @@ const formatTime = (time) => {
   return `${hour12}:${minutes} ${ampm}`;
 };
 
-/**
- * Converts any time string to total minutes since midnight.
- * Handles BOTH formats:
- *   "08:00 AM" / "08:00 PM"  (12hr with meridiem)
- *   "08:00"    / "20:00"     (24hr)
- */
 const timeToMinutes = (timeStr) => {
   if (!timeStr) return 0;
 
@@ -84,12 +67,6 @@ const calcScore = (latenessMinutes) => {
   return 4;
 };
 
-// ─────────────────────────────────────────────
-// Ensure today's tasks exist (idempotent)
-// Called on dashboard + today-tasks so tasks always
-// exist even if midnight cron missed or a new
-// medicine/routine was added after midnight.
-// ─────────────────────────────────────────────
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 const getISTDateString = (daysOffset = 0) => {
@@ -100,7 +77,7 @@ const getISTDateString = (daysOffset = 0) => {
 };
 
 const ensureTodayTasksExist = async (patientId) => {
-  const today = getISTDateString(0); // FIX: was UTC, wrong at midnight IST
+  const today = getISTDateString(0);
 
   const medicines = await Medicine.find({ patientId, status: "active" })
     .select("_id name timing")
@@ -165,9 +142,7 @@ const ensureTodayTasksExist = async (patientId) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// Dashboard
-// ─────────────────────────────────────────────
+// ------------- Dashboard Service --------------------
 
 export const getPatientDashboardService = async (patientId) => {
   try {
@@ -176,10 +151,9 @@ export const getPatientDashboardService = async (patientId) => {
       return { status: "NOT_FOUND", message: "Patient not found", data: null };
     }
 
-    // Ensure today's tasks are created (no-op if they already exist)
     await ensureTodayTasksExist(patientId);
 
-    const today = getISTDateString(0); // FIX: was UTC, wrong at midnight IST
+    const today = getISTDateString(0); 
     const currentMinutes = getCurrentTimeInMinutes();
 
     const todayTasks = await TaskTracking.find({
@@ -282,15 +256,13 @@ export const getPatientDashboardService = async (patientId) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// Today's Tasks
-// ─────────────────────────────────────────────
+// ------------------ Today's Tasks Service -----------------------
 
 export const getTodayTasksService = async (patientId) => {
   try {
     await ensureTodayTasksExist(patientId);
 
-    const today = getISTDateString(0); // FIX: was UTC
+    const today = getISTDateString(0); 
     const currentMinutes = getCurrentTimeInMinutes();
 
     const tasks = await TaskTracking.find({ patientId, scheduledDate: today }).sort({
@@ -306,30 +278,20 @@ export const getTodayTasksService = async (patientId) => {
       const scheduledMinutes = timeToMinutes(task.scheduledTime);
       const minutesDiff = currentMinutes - scheduledMinutes;
 
-      // Effective display status — do NOT save to DB here (alert.service owns mutations)
       let displayStatus = task.status;
       if (displayStatus === "pending" && minutesDiff > 30) {
         displayStatus = "missed";
       }
 
-      // FIX: completed tasks must ALWAYS use the DB latenessMinutes (even if 0).
-      // Old logic used minutesDiff (current time - scheduled time) for completed tasks
-      // with latenessMinutes=0, which gives a huge wrong number hours later.
-      // e.g. completed on time at 10:45 AM → latenessMinutes=0, score=0 in DB.
-      // But at 7:52 PM the old code calculated minutesDiff=547 and showed "9h 7m late".
       let effectiveLatenessMinutes;
       if (displayStatus === "completed") {
-        // Completed: always trust DB value (set correctly at completion time)
         effectiveLatenessMinutes = task.latenessMinutes || 0;
       } else if (displayStatus === "missed") {
-        // Missed: use DB value if set, otherwise current diff
         effectiveLatenessMinutes = task.latenessMinutes > 0 ? task.latenessMinutes : minutesDiff;
       } else {
-        // Pending/late: show how late it currently is
         effectiveLatenessMinutes = minutesDiff > 0 ? minutesDiff : 0;
       }
 
-      // Use DB score if already set by cron, otherwise derive from display status
       const effectiveScore =
         displayStatus === "missed" && task.score === 0
           ? 4
@@ -364,7 +326,6 @@ export const getTodayTasksService = async (patientId) => {
       }
     }
 
-    // Sort: upcoming by time asc, missed by lateness desc
     allTasks.sort((a, b) => a.sortTime - b.sortTime);
     upcoming.sort((a, b) => a.sortTime - b.sortTime);
     missed.sort((a, b) => b.latenessMinutes - a.latenessMinutes);
@@ -392,9 +353,7 @@ export const getTodayTasksService = async (patientId) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// Medicines
-// ─────────────────────────────────────────────
+//  ---------------------- Get Medicines Service --------------------------
 
 export const getPatientMedicinesService = async (patientId) => {
   try {
@@ -448,9 +407,7 @@ export const getPatientMedicinesService = async (patientId) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// Routines
-// ─────────────────────────────────────────────
+//  ---------------------- Get Routines Service --------------------------
 
 export const getPatientRoutinesService = async (patientId) => {
   try {
@@ -491,9 +448,7 @@ export const getPatientRoutinesService = async (patientId) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// Task Details
-// ─────────────────────────────────────────────
+//  ---------------------- Get Task Details Service --------------------------
 
 export const getTaskDetailsService = async (taskId, patientId) => {
   try {
@@ -527,7 +482,6 @@ export const getTaskDetailsService = async (taskId, patientId) => {
     const scheduledMinutes = timeToMinutes(task.scheduledTime);
     const minutesDiff = currentMinutes - scheduledMinutes;
 
-    // Effective display status
     let displayStatus = task.status;
     if (displayStatus === "pending" && minutesDiff > 30) {
       displayStatus = "missed";
@@ -539,7 +493,6 @@ export const getTaskDetailsService = async (taskId, patientId) => {
       minutesDiff >= -30 &&
       minutesDiff <= 30;
 
-    // FIX: completed tasks must use DB latenessMinutes (even if 0), never current time diff
     let effectiveLatenessMinutes;
     if (displayStatus === "completed") {
       effectiveLatenessMinutes = task.latenessMinutes || 0;
@@ -572,9 +525,7 @@ export const getTaskDetailsService = async (taskId, patientId) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// Complete Task
-// ─────────────────────────────────────────────
+//  ---------------------- Completed Task Service --------------------------
 
 export const completeTaskService = async (taskId, patientId) => {
   try {
@@ -634,7 +585,6 @@ export const completeTaskService = async (taskId, patientId) => {
     task.score = score;
     await task.save();
 
-    // Update source record
     if (task.taskType === "Medicine") {
       await Medicine.findByIdAndUpdate(task.taskId, { lastTaken: now });
     } else {
@@ -668,9 +618,7 @@ export const completeTaskService = async (taskId, patientId) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// Notifications
-// ─────────────────────────────────────────────
+//  ---------------------- Notification Service --------------------------
 
 export const getPatientNotificationsService = async (patientId) => {
   try {

@@ -1,7 +1,3 @@
-/**
- * patientTask.controller.js
- * CareMind – Patient task HTTP controllers
- */
 
 import {
   getPatientDashboardService,
@@ -14,9 +10,8 @@ import {
   markNotificationReadService,
 } from "../services/patientTask.service.js";
 
-// ─────────────────────────────────────────────
-// Dashboard
-// ─────────────────────────────────────────────
+// ------------- Dashboard Controller -------------------------
+
 export const getPatientDashboard = async (req, res) => {
   try {
     const patientId = req.user.userId;
@@ -31,9 +26,8 @@ export const getPatientDashboard = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// Today's Tasks
-// ─────────────────────────────────────────────
+// ----------------- Today's Tasks Controller ---------------------
+
 export const getTodayTasks = async (req, res) => {
   try {
     const patientId = req.user.userId;
@@ -47,9 +41,8 @@ export const getTodayTasks = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// Medicines
-// ─────────────────────────────────────────────
+//  ---------------------- Get Medicines Controller --------------------------
+
 export const getPatientMedicines = async (req, res) => {
   try {
     const patientId = req.user.userId;
@@ -63,9 +56,8 @@ export const getPatientMedicines = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// Routines
-// ─────────────────────────────────────────────
+// ----------------- Get Routines Controller ----------------------------------
+
 export const getPatientRoutines = async (req, res) => {
   try {
     const patientId = req.user.userId;
@@ -79,9 +71,8 @@ export const getPatientRoutines = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// Task Details
-// ─────────────────────────────────────────────
+// -------------------- Task Details Controller ------------------------------
+
 export const getTaskDetails = async (req, res) => {
   try {
     const patientId = req.user.userId;
@@ -102,9 +93,8 @@ export const getTaskDetails = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// Complete Task
-// ─────────────────────────────────────────────
+// ------------------- Complete Task Controller ------------------------
+
 export const completeTask = async (req, res) => {
   try {
     const patientId = req.user.userId;
@@ -125,9 +115,8 @@ export const completeTask = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// Notifications
-// ─────────────────────────────────────────────
+// -------------------- Notifications Controller ---------------------
+
 export const getPatientNotifications = async (req, res) => {
   try {
     const patientId = req.user.userId;

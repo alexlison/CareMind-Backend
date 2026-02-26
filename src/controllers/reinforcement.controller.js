@@ -1,13 +1,3 @@
-/**
- * reinforcement.controller.js
- * CareMind – Reinforcement profile HTTP controllers
- *
- * BUG FIXED:
- *   calculateTodayScore was using new Date().toISOString().split("T")[0]
- *   which returns UTC date. At midnight IST (= 18:31 UTC previous day)
- *   this returns yesterday's date → calculates wrong day's score.
- *   Fix: use IST-aware date string.
- */
 
 import {
   getReinforcementProfileService,
@@ -86,8 +76,6 @@ export const calculateTodayScore = async (req, res) => {
   try {
     const patientId = req.user.userId;
 
-    // FIX: was new Date().toISOString().split("T")[0] → UTC date
-    // At midnight IST (= 18:31 UTC previous day) this returned yesterday's date.
     const today  = getISTDateString(0);
     const result = await calculateDailyScoreService(patientId, today);
 
