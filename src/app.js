@@ -4,6 +4,7 @@ import cors from "cors";
 import authRoutes from "./routes/auth.routes.js";
 import caregiverRoutes from "./routes/caregiver.routes.js";
 import patientRoutes from "./routes/patient.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
 import automationRoutes from "./routes/automation.routes.js";
 
 
@@ -22,6 +23,7 @@ app.use("/relations", express.static("relations"));
 app.use("/api/auth", authRoutes);
 app.use("/api/caregiver",caregiverRoutes);
 app.use("/api/patient", patientRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/automation", automationRoutes);
 
 
