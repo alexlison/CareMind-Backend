@@ -28,7 +28,7 @@ const patientSchema = new mongoose.Schema(
 
     caregiverId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Users",
       required: true,
     },
 
