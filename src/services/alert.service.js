@@ -299,7 +299,7 @@ export const markCaregiverNotificationReadService = async (notificationId, careg
     const notification = await CaregiverNotification.findOneAndUpdate(
       { _id: notificationId, caregiverId },
       { read: true },
-      { new: true }
+      { upsert: true, returnDocument: "after" }
     );
     if (!notification) return { status: "NOT_FOUND", message: "Notification not found", data: null };
     return { status: "SUCCESS", message: "Notification marked as read", data: notification };
