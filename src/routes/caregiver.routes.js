@@ -23,12 +23,20 @@ import {
   clearAllCaregiverNotifications,
 } from "../controllers/caregiverNotification.controller.js";
 import {  getReinforcementProfileForCaregiver } from "../controllers/reinforcement.controller.js";
+import { getCaregiverProfile, getDashboardStats, updateCaregiverProfile } from "../controllers/caregiverProfile.controllers.js";
 
 
 const router = express.Router();
 
 router.use(authenticate);
 router.use(isCaregiver);
+
+// ========= DASHBOARD ROUTES =============
+router.get("/dashboard/stats", getDashboardStats);
+
+// ========= PROFILE ROUTES ==============
+router.get("/Myprofile", getCaregiverProfile);
+router.put("/updateMyProfile", updateCaregiverProfile);
 
 // ========== NOTIFICATION ROUTES ==========
 router.get("/notifications", getCaregiverNotifications);
