@@ -146,6 +146,7 @@ export const getAllPatientsService = async () => {
           name: patient.name,
           nickName: patient.nickName,
           email: patient.email,
+          imageUrl: patient.imageUrl,
           phone: patient.emergencyContact?.phone,
           caregiverName: patient.caregiverId?.caregiver?.name,
           caregiverEmail: patient.caregiverId?.caregiver?.email,
