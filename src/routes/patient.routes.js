@@ -23,6 +23,7 @@ import {
   getReinforcementProfile,
   calculateTodayScore,
 } from "../controllers/reinforcement.controller.js";
+import { getMyCaregiver, getMyProfile, getMyRelations } from "../controllers/patientProfile.controllers.js";
 
 const router = express.Router();
 
@@ -32,6 +33,10 @@ router.use(isPatient);
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 router.get("/dashboard", getPatientDashboard);
+router.get("/my-profile", getMyProfile);
+router.get("/my-caregiver", getMyCaregiver);
+router.get("/my-relations", getMyRelations);
+
 
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 router.get("/today-tasks", getTodayTasks);
