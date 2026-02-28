@@ -84,7 +84,6 @@ export const getMyCaregiverService = async (patientId) => {
 export const getMyRelationsService = async (patientId) => {
   try {
     const relations = await Relation.find({ patientId })
-      .select("name relation phone alive photo")
       .sort({ name: 1 });
 
     return {
