@@ -24,6 +24,7 @@ import {
   calculateTodayScore,
 } from "../controllers/reinforcement.controller.js";
 import { getMyCaregiver, getMyProfile, getMyRelations } from "../controllers/patientProfile.controllers.js";
+import { clearChatHistory, getChatHistory, sendMessage } from "../controllers/chatbot.controller.js";
 
 const router = express.Router();
 
@@ -56,5 +57,11 @@ router.put("/notifications/:id/read", markNotificationRead);
 // ── Reinforcement ─────────────────────────────────────────────────────────────
 router.get("/reinforcement/profile", getReinforcementProfile);
 router.get("/reinforcement/today-score", calculateTodayScore);
+
+
+// ── Chatbot ────────────────────────────────────────────────────────────────
+router.post("/chat",sendMessage);
+router.get("/chat/history",getChatHistory);
+router.delete("/chat/clear",clearChatHistory);
 
 export default router;
